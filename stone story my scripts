@@ -1,0 +1,626 @@
+?item.right.state = 3
+ equipR *0 shield //trash
+ equip @item.right@
+?item. left.state = 3
+ equipl *0 wand //trash
+ equipl @item.left@
+
+
+
+// Pet Dog
+// by: standardcombo
+// v1.1
+
+?loc.begin
+  > Press ENTER to bark!
+
+
+var petColor
+petColor = #white
+
+var keepDistance = -36
+var maxX = -19
+
+var maxDistance
+maxDistance = -70
+
+var targetZ = -4
+
+var x = 0
+var y = 0
+var myX = 0
+var myZ = 0
+var lastPlayerX = 0
+var lastPlayerZ = 0
+
+var stateNone = 0
+var stateIdle = 1
+var stateBark = 2
+var stateJump = 3
+var stateStopping = 4
+var currentState = stateNone
+var stateTime = 0
+
+var barkDuration = 6
+
+
+func SetState(newState)
+  ?newState = stateJump
+    play haunted_gate_shuffle
+
+  currentState = newState
+  stateTime = 0
+
+
+?currentState = stateNone | time = 1
+  lastPlayerX = pos.x
+  lastPlayerZ = pos.z
+  myX = keepDistance
+  myZ = targetZ
+
+  // Start further away if the frog is summoned while the location is already running
+  ?time > 1
+    myX = maxDistance
+
+  SetState(stateIdle)
+
+
+// Bark input
+?key = primaryBegin
+  play dog_bark
+  ?currentState = stateIdle
+    SetState(stateBark)
+  :?currentState = stateBark
+    stateTime = 1
+
+
+myX = myX - (pos.x - lastPlayerX)
+
+stateTime++
+
+?currentState = stateIdle
+  ?myX < maxDistance | myX > -maxDistance
+    myX = maxDistance
+  myZ = myZ - (pos.z - lastPlayerZ)
+
+  ?myX < keepDistance
+    SetState(stateJump)
+
+:?currentState = stateBark
+  ?stateTime >= barkDuration
+    SetState(stateIdle)
+  myZ = myZ - (pos.z - lastPlayerZ)
+
+:?currentState = stateJump
+  ?myX < maxX
+    myX++
+
+  ?stateTime >= 6 & time % 2 = 0
+    ?myZ > targetZ
+      myZ--
+    :?myZ < targetZ
+      myZ++
+
+  ?stateTime >= 12
+    ?myX < maxX - 1
+      SetState(stateJump)
+    :
+      SetState(stateStopping)
+
+:?currentState = stateStopping
+  ?stateTime >= 1
+    SetState(stateIdle)
+
+
+lastPlayerX = pos.x
+lastPlayerZ = pos.z
+
+
+// Draw
+
+?currentState = stateIdle
+  >o@myX@,@myZ@,@petColor@,ascii
+#
+#
+#########|\´/
+#########/   -,
+######,-´ `--´
+#####/ _   ;
+#### , _)\(
+#### `-'  `＂
+asciiend
+
+  x = myX + 8
+  y = myZ + 3
+  
+  ?face = ＂^^＂
+    >o@x@,@y@,@petColor@,ascii
+#/ ^^
+asciiend
+
+  :?(bighead = false & time % 90 > 8) | face = ＂''＂ | face = ＂,,＂ | face = ＂°°＂
+    >o@x@,@y@,@petColor@,ascii
+#/ ''
+asciiend
+
+
+  // Tongue
+  
+  y++
+  
+  ?time % 100 < 50
+    ?time % 100 <= 3 | time % 100 >= 46
+      >o@x@,@y@,@petColor@,ascii
+# `--'
+asciiend
+
+    :?time % 100 <= 7 | time % 100 >= 42
+      >o@x@,@y@,@petColor@,ascii
+# `-';
+asciiend
+
+    :?time % 8 <= 3
+      >o@x@,@y@,@petColor@,ascii
+# `-\)
+asciiend
+    :
+      >o@x@,@y@,@petColor@,ascii
+# `-`'
+asciiend
+
+
+?currentState = stateBark
+  ?stateTime = 0 | stateTime = (barkDuration - 1)
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+#
+#########|\|
+#########/  `-,
+######,-´ `--`
+#####/ _   ;
+#### , _)\(
+#### `-'  `＂
+asciiend
+  :
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+#
+#########\``--,
+#########/ _.-'
+######,-´  |
+#####/ _   ;
+#### , _)\(
+#### `-'  `＂
+asciiend
+
+
+?currentState = stateIdle | currentState = stateBark
+  // Tail
+  
+  x = myX
+  y = myZ + 5
+  
+  ?time % 10 <= 1
+    >o@x@,@y@,@petColor@,ascii
+#
+#,--'
+#`- ‾
+asciiend
+
+  :?time % 10 = 2
+    >o@x@,@y@,@petColor@,ascii
+#
+#,--'
+#\' ‾
+asciiend
+
+  :?time % 10 = 3
+    >o@x@,@y@,@petColor@,ascii
+#
+,--'´
+'´ ‾ 
+asciiend
+
+  :?time % 10 = 4
+    >o@x@,@y@,@petColor@,ascii
+#_
+#\`'´
+##`‾ 
+asciiend
+
+  :?time % 10 = 5 | time % 10 = 6
+    >o@x@,@y@,@petColor@,ascii
+##,
+#(`'´
+##‾  
+asciiend
+
+  :?time % 10 = 7
+    >o@x@,@y@,@petColor@,ascii
+#,
+#\`-´
+##‾‾ 
+asciiend
+
+  :?time % 10 = 8
+    >o@x@,@y@,@petColor@,ascii
+#
+\---'
+#` ‾ 
+asciiend
+
+  :?time % 10 = 9
+    >o@x@,@y@,@petColor@,ascii
+#
+#,--'
+´‾ ‾‾
+asciiend
+
+
+
+?currentState = stateJump
+  ?stateTime/2 = 0
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+###########-.-,
+##########.´ ''-,
+#;###.--'´  `--´
+#\`-´   _  /
+##`´#\ )| /`.
+#####(( ;/ `'
+######`＂´
+asciiend
+
+  :?stateTime/2 = 1
+    >o@myX@,@myZ@,@petColor@,ascii
+###########-.-,
+###########/ ''-,
+#######_.-´ `--´
+#,##,-´     /
+('-´    _. /`-.
+#`'´| ;‾#`,|##`'
+####// \#.-'
+###`'##`'
+asciiend
+
+  :?stateTime/2 = 2
+    >o@myX@,@myZ@,@petColor@,ascii
+###########|\´/
+#########_.´ ''-,
+####,-'´    `--´
+,.-´     _  )_
+`-'/ _.´##'--,)
+#,´.´.######, 
+#|| (####### `'
+#`'#`'
+asciiend
+
+  :?stateTime/2 = 3
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+###########;(,|
+,.---._ __.' ''-,
+`-'´.       `--´
+###/ ,-.__  |
+#,´-´#####`-.`.
+'´#`'######, `,)
+###########`-'
+asciiend
+
+  :?stateTime/2 = 4
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+#,
+('-._######;(,|
+ `'´ `-.__.' ''-,
+####/       `--´
+#,-´_.´`.__ !
+#'´'#####, `.`.
+#########`-' `-'
+asciiend
+
+  :?stateTime/2 = 5
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+#
+#;#########|\´/
+#\`-----._.´ ''-,
+##`´/       `--´
+###,'_,-._/ !
+####\\.##,|(
+#####`＂#'´`-'
+asciiend
+
+
+
+?currentState = stateStopping
+  ?stateTime = 0
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+#
+##########|\´/
+#;########/ ''-,
+#\`--.---´ `--´
+##`´|  ;  , !
+####`,(`--|(
+##### `＂  `-'
+asciiend
+  :
+    >o@myX@,@myZ@,@petColor@,ascii
+#
+#
+#########|\´/
+#########/ ''-,
+#;###,--´ `--´
+#\`-´  -.  ;
+##`- ;,-'\(
+#####`-'  `＂
+asciiend
+
+
+// A Crown for Pallas, version 0.7
+// by Fyda
+// with thanks to raeborga and Ofek for many helpful suggestions
+
+var inStageTwo = 0
+
+var leftBooo
+var rightBooo
+var leftBoooSweat
+var rightBoooSweat
+var currentModulo
+var leftSways = 0
+var rightSways = 0
+var crownFalling = 0
+var crownNoisePlayed = 0
+
+var leftBoooX = -3
+var leftBoooY = -4
+var rightBoooX = 16
+var rightBoooY = -4
+
+var leftBoooSweatX = -3
+var leftBoooSweatY = -4
+var rightBoooSweatX = 23
+var rightBoooSweatY = -4
+
+var crownBaseX = 6
+var crownBaseY = -6
+var crownJewelsX = 6
+var crownJewelsY = -4
+var crownLiningX = 6
+var crownLiningY = -3
+
+func ResetBooos()
+ leftBoooY = -22
+ rightBoooY = -22
+ leftBoooSweatY = -22
+ rightBoooSweatY = -22
+ ?leftSways = rightSways
+  leftSways = 0
+  rightSways = 0
+
+func ResetCrown()
+ crownBaseY = -24
+ crownJewelsY = -22
+ crownLiningY = -21
+ crownFalling = 0
+ crownNoisePlayed = 0
+
+var leftBooo1 = ascii
+####.-.
+###(- -) 
+###\ ‾ `-´
+####) /
+####|/
+####'
+asciiend
+
+var leftBooo2 = ascii
+####.-.
+###(> <) 
+###\ ‾ `-´
+####\ /
+####'/
+####!
+asciiend
+
+var rightBooo1 = ascii
+###.-.
+##(- -) 
+`-´ ‾ /
+###\ (
+####\|
+#####'
+asciiend
+
+var rightBooo2 = ascii
+###.-.
+##(> <) 
+`-´ ‾ /
+###\ /
+####\'
+#####!
+asciiend
+
+var leftBoooSweat1 = ＂°·＂
+var leftBoooSweat2 = ＂`#＂
+var leftBoooSweat3 = ＂#.＂
+var leftBoooSweat4 = ＂·´＂
+
+var rightBoooSweat1 = ＂·°＂
+var rightBoooSweat2 = ＂#´＂
+var rightBoooSweat3 = ＂.#＂
+var rightBoooSweat4 = ＂.`＂
+
+var crownBase = ascii
+,####†####,
+\\_,/ \,_//
+#\_∞_☼_∞_/
+(…÷…÷…÷…÷…)
+#‾‾‾‾‾‾‾‾‾
+asciiend
+
+var crownJewels = ascii
+###∞#☼#∞
+asciiend
+
+var crownLining = ascii
+(…÷…÷…÷…÷…)
+asciiend
+
+func Descend()
+ ?crownFalling = 0
+  ?currentModulo = 0
+   ?leftBoooY < -5
+    leftBoooY++
+   ?rightBoooY < -5
+    rightBoooY++
+   ?leftBoooSweatY < -5
+    leftBoooSweatY++
+   ?rightBoooSweatY < -5
+    rightBoooSweatY++
+   ?crownBaseY < -7
+    crownBaseY++
+   ?crownJewelsY < -5
+    crownJewelsY++
+   ?crownLiningY < -4
+    crownLiningY++
+ ?crownFalling = 1
+  ?time % 2 = 0
+   ?crownBaseY < 5
+    crownBaseY++
+   ?crownJewelsY < 7
+    crownJewelsY++
+   ?crownLiningY < 8
+    crownLiningY++
+
+func PlayCrownNoise()
+ play perfected_defense
+ crownNoisePlayed = 1
+
+func SwayLeft()
+ leftBoooX--
+ rightBoooX--
+ leftBoooSweatX--
+ rightBoooSweatX--
+ crownBaseX--
+ crownJewelsX--
+ crownLiningX--
+ leftSways++
+
+func SwayRight()
+ leftBoooX++
+ rightBoooX++
+ leftBoooSweatX++
+ rightBoooSweatX++
+ crownBaseX++
+ crownJewelsX++
+ crownLiningX++
+ rightSways++
+ 
+func Sway()
+ ?currentModulo = 0
+  ?crownFalling = 0
+   ?leftSways < rightSways
+    SwayLeft()
+   :
+    SwayRight()
+  
+func DrawBooos()
+ ?time % 8 = 0
+  leftBooo = leftBooo1
+  rightBooo = rightBooo1
+ ?time % 5 = 0
+  leftBooo = leftBooo2
+  rightBooo = rightBooo2
+ >c@leftBoooX@,@leftBoooY@,#5a5a5a,@leftBooo@
+ >c@rightBoooX@,@rightBoooY@,#5a5a5a,@rightBooo@
+
+func DrawSweat()
+ ?currentModulo < 2
+  leftBoooSweat = leftBoooSweat1
+  rightBoooSweat = rightBoooSweat1
+ ?currentModulo > 1 & currentModulo < 5
+  leftBoooSweat = leftBoooSweat2
+  rightBoooSweat = rightBoooSweat2
+ ?currentModulo > 4 & currentModulo < 8
+  leftBoooSweat = leftBoooSweat3
+  rightBoooSweat = rightBoooSweat3
+ ?currentModulo > 7
+  leftBoooSweat = leftBoooSweat4
+  rightBoooSweat = rightBoooSweat4
+ >c@leftBoooSweatX@,@leftBoooSweatY@,#ffffff,@leftBoooSweat@
+ >c@rightBoooSweatX@,@rightBoooSweatY@,#ffffff,@rightBoooSweat@
+ 
+func DrawCrown()
+ >c@crownBaseX@,@crownBaseY@,#ffca00,@crownBase@
+ >c@crownJewelsX@,@crownJewelsY@,#ff0a00,@crownJewels@
+ >c@crownLiningX@,@crownLiningY@,#ffffff,@crownLining@
+
+// start the objects at the top edge of the screen
+// and track whether we've reached Pallas stage 2
+?loc = undead_crypt
+ ?loc.begin
+  ResetBooos()
+  ResetCrown()
+ ?loc.loop
+  ResetBooos()
+  ResetCrown()
+  inStageTwo = 0
+ ?foe = pallas & foe = stage_2
+  inStageTwo = 1
+
+// once we've reached stage 2, activate
+?inStageTwo = 1
+ currentModulo = time % 5
+ ?crownFalling = 0
+  Sway()
+  Descend()
+  DrawBooos()
+  DrawSweat()
+  DrawCrown()
+ ?crownFalling = 1
+  Descend()
+  DrawCrown()
+  ?crownNoisePlayed = 0
+   PlayCrownNoise()
+ ?foe.count = 0
+  ResetBooos()
+  crownFalling = 1
+
+// Star Cloak - by Raeborga
+// v1.0
+// Requires big head
+
+var bgc = white
+
+?loc.stars>30
+ bgc=rain
+?loc.stars<31
+ bgc=red
+?loc.stars<26
+ bgc=blue
+?loc.stars<21
+ bgc=green
+?loc.stars<16
+ bgc=yellow
+?loc.stars<11
+ bgc=cyan
+?loc.stars<6
+ bgc=white
+?loc.stars<1
+ bgc=magenta
+
+>h-3,-2,#bf9f7f,ascii
+##__##
+##, `#
+#(###)
+##^.^##
+#//####
+´´###``
+asciiend
+
+>h-2,-1,#@bgc@,ascii
+☆
+asciiend
