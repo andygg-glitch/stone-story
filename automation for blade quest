@@ -1,0 +1,15 @@
+?foe.distance > 16
+ equipL trisk
+:?foe.count >= 16 &
+^item.GetCooldown(＂blade＂) = 0
+  equip blade 
+  activate R
+:?foe = ＂boss＂
+  equip heavy hammer
+  ?item.GetCooldown(＂hammer＂) = 0 &
+  ^item. CanActivate()
+    activate R
+:
+  equip heavy hammer
+?hp <= 10
+ activate potion
