@@ -1,0 +1,61 @@
+
+?foe.distance > 16
+ equipL trisk
+ equipR dashing shield *max*
+:?foe.count >= 10 &
+^item.GetCooldown (＂blade＂) = 0
+  equip blade 
+  activate R
+?foe.distance < 16
+  equip blade
+
+// Boss: Dysangelos, phase 1 (base form)
+  ?foe = dysangelos_bearer
+    equipL sword ice dI
+    equipR sword ice dI *8
+   
+// Boss: Dysangelos, phase 2 (elemental form)
+  ?foe = dysangelos_elementalist
+    equipL sword
+    equipR shield
+   ?foe = ＂fire＂
+     equipL æther *8 sword
+     equipR æther *8 sword
+   ?foe = ＂ice＂
+     equipL fire sword +11
+     equipR fire sword +10
+   ?foe = ＂poison＂
+     equipL ice *8 sword
+     equipR ice *8 sword +1
+   ?foe = ＂vigor＂
+     equipL poison *8 sword
+     equipR poison *8 sword
+   ?foe = ＂æther＂
+     equipL vigor *8 sword +1
+     equipR vigor *8 sword
+ 
+// TODO use the proper runes against
+    // the current rune in the eye of the boss
+
+  // Boss: Dysangels, phase 3 (perfect form)
+  ?foe = dysangelos_perfected
+    equipL sword
+    equipR shield
+    ?foe.armor > 0
+      
+      loadout 3
+    // Their most powerful move deals 30 damage
+    // points on 5* difficulty, so we need to
+    // heal if we don't have enough health and
+    // armor combined
+    ?(hp + armor) < 31
+      activate potion
+
+?item.right.state = 3
+ equipR *0 shield //trash
+ equip @item.right@
+?item. left.state = 3
+ equipl *0 wand //trash
+ equipl @item.left@
+
+
