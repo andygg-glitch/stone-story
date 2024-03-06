@@ -1,0 +1,71 @@
+
+?loc = bronze_guardian
+  ?time > 600 & foe.distance > 10
+    // Guardian is now attackable from afar
+    equip repeating
+  ?pos.y > 0 & foe.distance > 5
+    // Guardian hits, we jump on its hand
+    equipL æther sword
+    equipR bashing
+  :?foe.distance <= 5
+    // We are on its arm, close to its face
+    ?foe.armor > 0
+      equip blade
+      activate potion
+
+
+
+?foe.distance > 16
+ equip rep
+?foe.distance < 16
+ equip blade
+
+
+
+// Boss: Dysangelos, phase 1 (base form)
+  ?foe = dysangelos_bearer
+    equip blade
+   
+// Boss: Dysangelos, phase 2 (elemental form)
+  ?foe = dysangelos_elementalist
+    equipL sword
+    equipR shield
+   ?foe = ＂fire＂
+     equipL æther *8 sword +10
+     equipR æther *8 sword +5
+   ?foe = ＂ice＂
+     equipL fire sword +11
+     equipR fire sword +10
+   ?foe = ＂poison＂
+     equipL ice *8 sword D
+     equipR ice *8 sword dI
+   ?foe = ＂vigor＂
+     equipL poison *8 sword +7
+     equipR poison *8 sword +6
+   ?foe = ＂æther＂
+     equipL vigor *8 sword dL +6
+     equipR vigor *8 sword +5
+ 
+// TODO use the proper runes against
+    // the current rune in the eye of the boss
+
+  // Boss: Dysangels, phase 3 (perfect form)
+  ?foe = dysangelos_perfected
+    equip blade
+    ?foe.armor > 0
+      
+      loadout 3
+    // Their most powerful move deals 30 damage
+    // points on 5* difficulty, so we need to
+    // heal if we don't have enough health and
+    // armor combined
+    ?(hp + armor) < 31
+      activate potion
+
+?item.right.state = 3
+ equipR *0 shield //trash
+ equip @item.right@
+?item. left.state = 3
+ equipl *0 wand //trash
+ equipl @item.left@
+
