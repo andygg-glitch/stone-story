@@ -1,0 +1,1561 @@
+/*
+Original script & art by Luna the Ghost (lunatheghost)
+
+Continued updates by qrupafjzvm1 (qrupafjzvm1), Ket (ket.6226),
+                     BurningInferno (burninginferno24), Ramen (ramen47)
+Testers: qrupafjzvm1, BurningInferno, Ket, Mallathor (mallathor),
+         ASCII (sussimator_hates_fighting), Citriondragon (citriondragon)
+with help from everyone in the #Dragon Pet Bounty thread
+  
+  Version: v1.4.2
+
+To run the script:
+import Cosmetics/PetDragonRPG
+
+To add your mindstone save to the save in the cosmetic folder, paste this:
+var PDRPG = import Cosmetics/PetDragonRPG
+PDRPG.replaceSave(getSave())
+
+Train your very own dragon:
+Watch as it grows from a tiny lizard to a terror of the skies!
+
+Complete quests at Deadwood Waterfall to level it up.
+
+Features 6 growth stages, 4 of which with their own animations.
+(The first two are egg forms, best left at home)
+
+ Lv0: Egg
+ Lv4: Hatchling
+ Lv8: Baby
+Lv12: Juvenile
+Lv20: Adult 
+*/
+
+//Text translations.
+
+
+//Special tags used for elements.
+var _UIPANEL = 1
+var _UITEXT = 2
+var _UIBUTTON = 3
+var _UIANIM = 4
+
+var _MODESTOP = 10
+var _MODESLOW = 11
+var _MODEFAST = 12
+var _MODECATCHUP = 13
+
+var _CURUISSRPG = 20
+var _CURUIWF = 21
+var _CURUISET = 22
+var _CURUIEXPORT = 23
+var _CURUISHOWSSRPG = 24
+var _CURUIMINWF = 25
+
+var _SHAPEDEFAULT = "Default"
+var _SHAPEBEAN = "BabyBean"
+var _SHAPENIPPER = "Nipper"
+var _SHAPEJUVENILE = "Juvenile"
+var _SHAPEDRAGON = "Dragon"
+
+//Function alias for performance.
+var foeCount = foe.GetCount
+
+var addPanel = ui.AddPanel
+var addText = ui.AddText
+var addButton = ui.AddButton
+var addStyle = ui.AddStyle
+var addAnim = ui.AddAnim
+
+var invisPanel = addStyle("#########")
+var specPanel = 41817
+
+var StoreGet = storage.Get
+var StoreInc = storage.Incr
+var StoreSet = storage.Set
+var StoreHas = storage.Has
+var StoreDelete = storage.Delete
+
+var stringSize = string.size
+var stringJoin = string.Join
+var screenFromWorldX = screen.FromWorldX
+var screenFromWorldZ = screen.FromWorldZ
+
+var mathMax = math.Max
+
+// UI Calls
+
+var masterPanel
+
+var wfUI
+var waterUI
+
+var setUI
+var settingsUI
+
+var potUI
+var exportUI
+
+var srUI
+var srpgUI
+
+var showSrpgUI
+
+//Checks if pet is enabled
+var PetIsEnabled = StoreGet("EnablePet",false)
+//Currently shown UI
+var currentUIshown
+//What shape the dragon is in
+var dragonShape = StoreGet("shapeshift",_SHAPEDEFAULT)
+//Dragon level
+var dragonLevel = StoreGet("dragonLevel",0)
+//Current quest 
+var curQuest = StoreGet("CurrentQuest",0)
+//Amount of delay per system check for most
+var ChecksPerFrame = StoreGet("15Fcheck", 15)
+//Number of items
+var killStorage = StoreGet("kills",0)
+var kiStorage = StoreGet("ki",0)
+var tarStorage = StoreGet("tar",0)
+var woodStorage = StoreGet("wood",0)
+var stoneStorage = StoreGet("stone",0)
+var bronzeStorage = StoreGet("bronze",0)
+
+//UI creators
+func startPanel()
+  masterPanel = addPanel()
+  masterPanel.x = -1
+  masterPanel.y = -1
+  masterPanel.w = screen.w + 2
+  masterPanel.h = screen.h + 2
+  masterPanel.dock = "top_left"
+  masterPanel.anchor = "top_left"
+  masterPanel.style = specPanel //drag
+  masterPanel.visible = false
+
+func makeUI(type, colour, anchor, function, xy, hw, text)
+  //Creates a UI object.
+  //"type" can be any tag above.
+  //If empty, throws an error.
+  //All other variables are self-explanatory. 
+  //If empty, gets the game's default value.
+  var funcHolder = function
+
+  ?type = _UIPANEL
+    function = addPanel()
+  :?type = _UITEXT
+    function = addText()
+  :?type = _UIBUTTON
+    function = addButton()
+    ?funcHolder
+      function.SetPressed(funcHolder)
+  :?type = _UIANIM
+    function = makeUI(_UIPANEL,"","","","","","")
+    function.style = invisPanel
+    function.Add(addAnim(text))
+    ?colour
+      function.children[0].color = colour
+    ?anchor
+      function.children[0].anchor = anchor
+      function.children[0].dock = anchor
+    text = ""
+  
+  ?colour
+    ?type = _UIBUTTON
+      function.hcolor = colour
+    :
+      function.color = colour
+    
+  ?text
+    function.text = text
+
+  ?xy
+    function.x = xy[0]
+    function.y = xy[1]
+
+  ?hw
+    function.h = hw[0]
+    function.w = hw[1]
+
+  ?anchor
+    function.anchor = anchor
+    function.dock = anchor
+  
+  masterPanel.Add(function)
+  
+  return function
+
+func uiAddChild(parent,childNumber,type,colour,anchor,function,xy,hw,text)
+  //Add a UI object to "parent".
+  //If "parent" is empty, throws an error.
+  //"type" can be any tag above.
+  //If empty, throws an error.
+  //All other variables are self-explanatory. 
+  //If empty, gets the game's default value.
+
+  ?type = _UITEXT
+    ?parent.children.Count() <= childNumber
+      parent.Add(addText())
+    ?text
+      parent.children[childNumber].text = text
+  :?type = _UIANIM
+    ?parent.children.Count() <= childNumber
+      parent.Add(addAnim(text))
+    :
+      parent.children[childNumber].Load(text)
+  :?type = _UIPANEL
+    ?parent.children.Count() <= childNumber
+      parent.Add(addPanel())
+  :?type = _UIBUTTON
+    ?parent.children.Count() <= childNumber
+      parent.Add(addButton())
+    ?text
+      parent.children[childNumber].text = text
+    ?function
+      parent.children[childNumber].SetPressed(function)
+
+  ?colour
+    ?type = _UIBUTTON
+      parent.children[childNumber].hcolor = colour
+    :
+      parent.children[childNumber].color = colour
+
+  ?xy
+    parent.children[childNumber].x = xy[0]
+    parent.children[childNumber].y = xy[1]
+
+  ?hw
+    parent.children[childNumber].h = hw[0]
+    parent.children[childNumber].w = hw[1]
+
+  ?anchor
+    parent.children[childNumber].anchor = anchor
+    parent.children[childNumber].dock = anchor
+
+//Savefile functions
+
+var savefileData = [
+^"dragonLevel", "EXP", "shapeshift",  //Dragon
+^"kills", "ki", "tar", "wood", "stone", "bronze", //Items
+^"CurrentQuest", "questKills", "questKi", "questTar", "questWood", "questStone", "questBronze", //Quest progress
+^"requiredKills", "requiredKi", "requiredTar", "requiredWood", "requiredStone", "requiredBronze", //Quest requirement
+^"completeKills", "completeKi", "completeTar", "completeWood", "completeStone", "completeBronze", // Quest count
+^"EXPcost", "cost1", "cost2", "killCost", "kiCost", "tarCost", "woodCost", "StoneCost", "BronzeCost", //Cost
+^"15Fcheck", "EnablePet", "showSsrpgUI"] //Settings
+
+var defaultSavefile = [
+^0,0,_SHAPEDEFAULT, //Dragon
+^0,0,0,0,0,0, //Items
+^0,0,0,0,0,0,0, //Quest progress
+^100,100,100,100,100,100, //Quest requirement
+^0,0,0,0,0,0, //Quest count
+^0,0,1,0,0,0,0,0,0, //Cost
+^15, false, false] //Settings
+
+func massUpdate()
+  //Updates all storage vars kept in user vars
+  curQuest = StoreGet("CurrentQuest",0)
+  dragonShape = StoreGet("shapeshift",_SHAPEDEFAULT)
+  dragonLevel = StoreGet("dragonLevel",0)
+
+func deleteSave()
+  //Deletes the savefile.
+  for i = 0..savefileData.Count()-1
+    StoreDelete(savefileData[i])
+  >Savefile deleted. Leave the level and rejoin to see changes.
+  loc.pause()
+
+func replaceSave(savefile)
+  //Imports a savefile.
+  for i = 0..savefileData.Count()-1
+    StoreSet(savefileData[i], savefile[i])
+  massUpdate()
+  >Savefile replaced. Leave the level and rejoin to see changes.
+  loc.pause()
+
+func resetSave()
+  //Resets the savefile.
+  for i = 0..savefileData.Count()-1
+    StoreSet(savefileData[i], defaultSavefile[i])
+  setLevelCost()
+  getNewQuest()
+  massUpdate()
+  >Savefile has been reset. Leave the level and rejoin to see changes.
+  loc.pause()
+
+func getSave()
+  //Returns the savefile export as an array.
+  var exD = []
+  for i = 0..savefileData.Count()-1
+    exD.Add(StoreGet(savefileData[i], defaultSavefile[i]))
+  return exD
+
+func printSave()
+  //Returns the savefile export as a string.
+  var exD = []
+  for i = 0..savefileData.Count()-1
+    exD.Add(StoreGet(savefileData[i], defaultSavefile[i]))
+    exD[i] = exD[i] + ""
+  return stringJoin(",", exD)
+
+//All assets
+
+var Walk = [ascii
+#
+###_
+##(_)
+asciiend,ascii
+#,Â´â¾`.
+(  .: )
+#`---Â´
+asciiend,ascii
+############,,
+##########,Â´ ")
+#########-V-vÂ´
+%%
+############,,
+##########,Â´ ")
+#########-V--V
+%%
+############,,
+##########,Â´ ")
+#########-v-vÂ´
+%%
+############,,
+##########,Â´ ")
+#########v--vÂ´
+asciiend,ascii
+#
+##################,#
+################.Â´ #
+###############Â´ ,._.Â´
+###############Â´w###W
+%%
+#
+##################,#
+################.Â´ #
+###############Â´ ,._.Â´
+###############Â´w###W
+%%
+#
+##################,#
+################.Â´ #
+###############Â´  ,_.Â´
+###############Â´#w#w
+%%
+#
+##################,#
+################.Â´ #
+###############Â´  ,_.Â´
+###############Â´#W#w
+asciiend,ascii
+##########7_7
+#########(. \
+########/ ;\_)
+###   Â´`( Â¡)
+#      / (Â¡;\
+#####,/ Â¡Â´#`Â¡\
+######Ww####Vw`
+%%
+##########7_7
+#########(. \
+########/ ;\_)
+###   Â´`( Â¡)
+#      / (Â¡;\
+#####,Â¡ \Â´#/ !
+#######Ww##Vw`
+asciiend,ascii
+##########7_7
+#########(. \
+########/ ;\_)
+###   Â´`( Â¡)
+#      / (Â¡;\
+#####,/ Â¡Â´#`Â¡\
+######Ww####Vw`
+%%
+##########7_7
+#########(. \
+########/ ;\_)
+###   Â´`( Â¡)
+#      / (Â¡;\
+#####,Â¡ \Â´#/ !
+#######Ww##Vw`
+asciiend]
+
+var Tail = ["#","#",ascii
+##`.
+###\`.
+####`
+%%
+##.
+##`:-.
+####`
+%%
+#.
+##`:-.
+####`
+%%
+#
+.,:;-.
+####`
+%%
+#.
+##`;-.
+####`
+%%
+##.
+##`;-.
+####`
+asciiend,ascii
+#
+#
+#
+##_#,.-
+Â´#``---
+%%
+#
+#
+#
+`,.#,.-
+###`---
+%%
+#
+#
+#`.
+##`.,.-
+####`--
+%%
+#
+##`.
+###`.
+####\`-
+#####`-
+%%
+#
+#
+#`.
+##`.,.-
+####`--
+%%
+#
+#
+#
+`,.#,.-
+###`---
+asciiend,ascii
+###########
+#####o#####
+######`Â·###
+#####,Â´##,~
+#####\`-Â´##
+######`-._,
+###########
+%%
+###########
+###o#######
+##.Â´#######
+##`.#####,~
+####`.,-Â´##
+#####`.,#_,
+###########
+%%
+###########
+###########
+#o#########
+,Â´#######,~
+#`.####,;##
+###`..Â´##_,
+######â¾####
+%%
+###########
+##o########
+##;########
+##`.#####,~
+###`..,-Â´##
+#####`.,#_,
+###########
+%%
+###########
+####o######
+#####`.####
+####.Â´###,~
+#####\`-Â´##
+######`-._,
+###########
+asciiend,ascii
+###########|\###/;
+#####|`..-â¾`;##!:
+######\\_   |##|
+######,`-`._\##
+#######\_`--;#
+######/Â´_,-Â´#
+######vÂ´##
+#
+#
+%%
+############.###
+##########: :##.
+#######.:`  :##:
+####:`      .##
+#####.      ;#
+######.    /#
+#######`.   #
+#########``#
+#
+%%
+#
+#######.
+#####.`;
+####:  :
+####:   `:
+####:     `
+#####:     
+#####`.     
+#######`. .`
+%%
+#
+#
+#
+#
+########_#_ .
+####,-Â´  .Â´/
+#< `   /;/\\
+###`-,;/_  \\
+#####V#â¾##``V
+asciiend]
+
+var Faces = [[],[],[
+"##", // 0 default
+"Â´`", // 1 low hp
+"00", // 2 approach boss
+"><", // 3 against boss or too fast
+"^^"  // 4 see treasure
+],[
+ascii
+####,_,
+-._/..)
+   _/Â´
+#
+asciiend,ascii
+####,_,
+-._/Â´`)
+   _/Â´
+#
+asciiend,ascii
+####,_,
+-._/00)
+   _/Â´
+#
+asciiend,ascii
+#
+-.. _,_,
+    _ ><)
+######`Â´
+asciiend,ascii
+####,_,
+-._/^^)
+   _/Â´
+#
+asciiend
+],[
+"#", // 0 default
+"Ã³", // 1 low hp
+"Ã²", // 2 approach boss
+">", // 3 against boss or too fast
+"^"  // 4 see treasure
+],[
+"#", // 0 default
+"Ã³", // 1 low hp
+"Ã²", // 2 approach boss
+">", // 3 against boss or too fast
+"^"  // 4 see treasure
+]]
+
+var dragonStatic = [ascii
+ _
+(") 
+ â¾
+asciiend,ascii
+ ,Â´â¾`.
+(  .: )
+ `---Â´
+asciiend,ascii
+`.    ,, 
+ \`.,Â´ ")
+  `-v-vÂ´
+asciiend,ascii
+           ,_,
+ `.   ,-._/..)
+.Â´  .Â´    _/Â´
+\`-Â´ _,_.Â´
+ `-Â´ w  w
+asciiend,ascii
+          7_7
+o        (.`\
+ `Â·     / ;\_)
+,Â´  ,~Â´`( Â¡)
+\`-Â´   / (Â¡;\
+ `-._,/Â¡Â´  `Â¡\
+      Ww    Vw`
+asciiend,ascii
+            _
+      /7    \\  7_7
+     /|\    /|\(.`\
+   /Â´ ||\-,/||/ ;\_)
+ /Â´ _ //_\ `-Â´( Â¡)
+ VÂ´ /`vÂ´\V   / (Â¡;\
+  ,Â´     `-./Â¡Â´  `Â¡\
+  \_        Ww    Vw`
+    `o
+asciiend]
+
+//Dragon variables
+var dragon // ui pet
+var dArry // ui array 
+
+var relativeX = 1
+var relativeY = 1
+
+var posY = 1
+var posX = 1
+
+var dragonX = 999
+var dragonY = 999
+
+var ttime = 1
+ttime = totaltime
+//
+
+var gLvL = GrowthLv()
+
+var clrSet = "" // Set Dragon Colour
+var mode = _MODESLOW
+
+//             ST,SL,FS 
+var tailDur = [96,48,12] 
+//             SL,FS
+var walkDur = [24,8]
+
+var jogSpeed = 1
+var runSpeed = 1
+
+var tooFar = 20 // Too far from Player
+
+var mHP = maxhp
+
+func faceModule()
+  //Changes the face being displayed on the dragon.
+  ?pickup = "treasure"
+    dArry[1].text = Faces[gLvL][4]
+  :?!ai.enabled
+    dArry[1].text = Faces[gLvL][2]
+  :?mHP/hp >= 3
+    dArry[1].text = Faces[gLvL][1]
+  :
+    dArry[1].text = Faces[gLvL][0]
+
+func runningX()
+  //Updates the X coord of the dragon.
+  ?mode = _MODESTOP
+    faceModule()
+    dArry[2].Play()
+    dArry[2].duration = tailDur[0]
+  :?mode = _MODESLOW
+    ?ttime % jogSpeed = 1
+      faceModule()
+      dArry[0].Play()
+      dArry[0].duration = walkDur[0]
+      dArry[2].Play()
+      dArry[2].duration = tailDur[1]
+      dragonX++
+  :?mode = _MODEFAST
+    ?gLvL = 4
+      ?ttime % 6 = 1
+        dragonX++
+    ?ttime % runSpeed = 1 | runSpeed = 1
+      dArry[1].text = Faces[gLvL][3]
+      dArry[0].Play()
+      dArry[0].duration = walkDur[1]
+      dArry[2].Play()
+      dArry[2].duration = tailDur[2]
+      dragonX++
+  :?mode = _MODECATCHUP
+    dArry[1].text = Faces[gLvL][3]
+    dArry[0].Play()
+    dArry[0].duration = walkDur[1]
+    dArry[2].Play()
+    dArry[2].duration = tailDur[2]
+    dragonX++
+func runDragon()
+  //Changes the dragon's mode, and updates its Y coords.
+  ?gLvL >= 2
+    posX = pos.x
+    ?ttime = 1
+      dragonX = posX-2
+      dragonY = pos.z - pos.y
+
+    runningX()
+    ?screenFromWorldX(posX) < 10 //Player is near the left of the screen
+      dragonX = mathMax(dragonX, posX - 10 * (4-runSpeed))
+    ?posX > dragonX
+      ?posX - dragonX >= tooFar
+        mode = _MODEFAST
+      :?posX - dragonX <= 1
+        mode = _MODESLOW
+    :
+      ?mode = _MODECATCHUP & posX <= dragonX
+        mode = _MODESLOW
+      ?dragonX > posX + 30
+        dragonX = posX - 30
+      :
+        mode = _MODESTOP
+
+    ?ttime % 10 = 1
+      posY = pos.z - pos.y
+      ?posY > dragonY
+        dragonY++
+      :?posY < dragonY
+        dragonY--
+      :?gLvL = 5 & posY = dragonY
+        dragonY++
+
+    dragon.x = screenFromWorldX(dragonX-relativeX)
+    dragon.y = screenFromWorldZ(dragonY-relativeY)
+
+//Quests
+
+var foecount = 0 // For counting kills
+var oldfoecount = 0
+var kiget = res.ki
+var oldkiget = kiget
+var woodget = res.wood
+var oldwoodget = woodget
+var stoneget = res.stone
+var oldstoneget = stoneget
+var target = res.tar
+var oldtarget = target
+var bronzeget = res.bronze
+var oldbronzeget = bronzeget
+
+var resNameArray = ["Kills","Souls","Resin","Fiber","Rocks","Metal"]
+var ResourceA = ["kills","ki","tar","wood","stone","bronze"]
+
+var questArray = [[
+// 0: Quests
+"Bane of Foes", // 0
+"Gather Souls", // 1
+"Gather Resin", // 2
+"Gather Fiber", // 3
+"Gather Rocks",  // 4
+"Gather Metal"  // 5
+],[  
+// 1: Dialogue
+"The dragon grows bored. Show it a spectacle and rouse its spirit!",   // 0
+"Warm with life, yet torn from the body, bleak and cold. A tragedy.",      // 1
+"Strange ooze from a cavern of spiders. Its origins are unknown.",         // 2
+"Tough strands from withered plants. Supposedly part of a healthy diet.",   // 3
+"Large round pebbles that seem to stare at you. Crunchy and savory.",      // 4
+"Tough assort metals from a boiling forge. Their durability is immense."    // 5
+],[
+// 2: Quest Progress
+"questKills", // 0
+"questKi",    // 1
+"questTar",   // 2
+"questWood",  // 3
+"questStone",  // 4
+"questBronze"  // 5
+],[
+// 3: Quest Complete Requirement
+"requiredKills", // 0
+"requiredKi",    // 1
+"requiredTar",   // 2
+"requiredWood",  // 3
+"requiredStone",  // 4
+"requiredBronze"  // 5
+],[
+// 4: Number of Quest Completions
+"completeKills", // 0
+"completeKi",    // 1
+"completeTar",   // 2
+"completeWood",  // 3
+"completeStone",  // 4
+"completeBronze"  // 5
+],[
+// 5: Cost of Upgrade
+"killCost", // 0
+"kiCost",   // 1
+"tarCost",  // 2
+"woodCost", // 3
+"StoneCost", // 4
+"BronzeCost" // 5
+]]
+
+func whichLongest(check)
+  //Checks the length of the longest possible value displayed.
+  var longest = 0
+  ?check = "res"
+    longest = mathMax(mathMax(killStorage,kiStorage),
+                     ^mathMax(tarStorage,woodStorage),
+                     ^mathMax(stoneStorage,bronzeStorage))
+  :
+    longest = check
+  
+  longest = longest + ""
+  return stringSize(longest)
+
+func LvInfo()
+  //Returns the current progress to the dragon's next level.
+  var cost1Storage = StoreGet("cost1",0)
+  var cost2Storage = StoreGet("cost2",0)
+  var resName1 = resNameArray[cost1Storage]
+  var resName2 = resNameArray[cost2Storage]
+
+  return 
+  ^ "      Level: "+dragonLevel
+  ^+"\nâ¢###â¢{Imbue Cost}â¢###â¢"
+  ^+"\n [-EXP-]: "+StoreGet("EXP",0)+"/"+StoreGet("EXPcost", 0)
+  ^+"\n ["+resName1+"]: "+StoreGet(ResourceA[cost1Storage],0)
+  ^+"/"+StoreGet(questArray[5][cost1Storage], 0)
+  ^+"\n ["+resName2+"]: "+StoreGet(ResourceA[cost2Storage],0)
+  ^+"/"+StoreGet(questArray[5][cost2Storage], 0)
+  ^+"\nâ¢####################â¢"
+
+func questDialogue()
+  //Returns the current quest dialogue.
+  ?curQuest = 0
+    var gLv = GrowthLv()
+    ?gLv = 0
+      return "The egg lies dormant. But carnage stirs something within it..."
+    :?gLv = 1
+      return "The egg shakes listlessly. Show it some action and entertain it!"
+  return questArray[1][curQuest]
+
+func getRequirement()
+  //Returns the requirement for the current quest.
+  return StoreGet(questArray[3][curQuest],100)
+
+func getProgress()
+  //Returns the progress for the current quest.
+  return StoreGet(questArray[2][curQuest],0)
+
+func rngSpecify(weight) 
+  //Returns a random value between 0..weight-1.
+  return rng % weight
+
+func setLevelCost()
+  //Sets the cost for the dragon's level.
+  // set EXP cost for level
+  var EXPcost = 10+(dragonLevel*10)
+  StoreSet("EXPcost", EXPcost)
+
+  // set which 2 random resources
+  var cost1 = rngSpecify(5)
+  var cost2 = rngSpecify(5)
+  ?cost2 >= cost1 
+   cost2++
+  StoreSet("cost1",cost1)
+  StoreSet("cost2",cost2)
+
+  //                 random resource        random cost 2-5    
+  StoreSet(questArray[5][cost1], EXPcost*( rngSpecify(4)+2 ) )
+  StoreSet(questArray[5][cost2], EXPcost*( rngSpecify(4)+2 ) )
+
+//Array used for the function below
+var dragonUpgradeLevels = [4,8,12,20]
+func LevelUpButton()
+  //Checks if it's possible to level up, and if so levels up the dragon.
+  var type1 = StoreGet("cost1",0)
+  var type2 = StoreGet("cost2",1)
+
+  var cost1 = StoreGet(questArray[5][type1],100)
+  var cost2 = StoreGet(questArray[5][type2],100)
+
+  var ResourceA1 = ResourceA[type1]
+  var ResourceA2 = ResourceA[type2]
+
+  var res1 = StoreGet(ResourceA1,0)
+  var res2 = StoreGet(ResourceA2,0)
+
+  var EXPhave = StoreGet("EXP", 0)
+  var EXPcost = StoreGet("EXPcost", 0)
+
+  ?res1 >= cost1 & res2 >= cost2 & EXPhave >= EXPcost
+    StoreInc("dragonLevel",1)
+    dragonLevel++
+    ?dragonUpgradeLevels.Contains(dragonLevel)
+      StoreSet("shapeshift",_SHAPEDEFAULT)
+      dragonShape = _SHAPEDEFAULT
+      GrowthDisplayUpdate(GrowthLv())
+      ?dragonLevel >= 20
+        settingsUI[3].children[4].text = _SHAPEDRAGON
+      :?dragonLevel >= 12
+        settingsUI[3].children[3].text = _SHAPEJUVENILE
+      :?dragonLevel >= 8
+        settingsUI[3].children[2].text = _SHAPENIPPER
+      :?dragonLevel >= 4
+        settingsUI[3].children[1].text = _SHAPEBEAN
+        ?dragonLevel = 4
+          PetIsEnabled = true
+          StoreSet("EnablePet", true)
+      settingsUI[3].children[5].text = "Current: "+dragonShape
+    StoreInc("EXP", -EXPcost)
+    StoreInc(ResourceA1, -cost1)
+    StoreInc(ResourceA2, -cost2)
+    setLevelCost()
+    waterUI[5].text = LvInfo()
+    waterUI[4].text = "Feed"
+  :
+    ?waterUI[4].text = "!MORE!"
+      waterUI[4].text = "!FOOD!"
+    :
+      waterUI[4].text = "!MORE!"
+
+func GrowthLv()
+  //Returns the dragon's growth stage.
+  ?dragonShape = _SHAPEBEAN
+    return 2
+  :?dragonShape = _SHAPENIPPER
+    return 3
+  :?dragonShape = _SHAPEJUVENILE
+    return 4
+  :?dragonShape = _SHAPEDRAGON
+    return 5
+
+  ?dragonLevel >= 20
+    return 5
+  :?dragonLevel >= 12
+    return 4
+  :?dragonLevel >= 8
+    return 3
+  :?dragonLevel >= 4
+    return 2
+  :?dragonLevel >= 2
+    return 1
+  :
+    return 0
+
+func randomQuest()
+  //Returns a random quest, different from the current quest.
+  var weights = questArray[0].Count()-1
+  ?weights = 0
+   return 0
+  var newQuest = rng % weights
+  ?newQuest >= curQuest
+   newQuest++
+  return newQuest
+
+func getNewQuest()
+  //Sets a new quest.
+  curQuest = randomQuest()
+  StoreSet("CurrentQuest", curQuest)
+  StoreSet(questArray[2][curQuest], 0)
+
+  var completed = StoreGet(questArray[4][curQuest],0)
+  completed = 100 + (completed*5)
+  ?completed > 2000
+    completed = 2000
+  StoreSet(questArray[3][curQuest], completed)
+
+  waterUI[7].text = "<< "+questArray[0][curQuest]+" >>"
+  waterUI[8].text = questDialogue()
+  waterUI[9].text = getProgress()+"/"+getRequirement()
+
+func questComplete() 
+  //Check if the quest is complete
+  return getProgress() >= getRequirement()
+
+func questFinished()
+  //Ends a quest.
+  StoreInc("EXP", getRequirement()/10 )
+  StoreInc(questArray[4][curQuest], 1)
+  waterUI[5].text = LvInfo()
+  waterUI[10].visible = false
+  getNewQuest()
+
+func getQuestCompleteDialogue()
+  //Returns the dialogue when a quest is completed.
+  var growth = GrowthLv()
+  ?curQuest = 0
+    ?growth = 5
+      waterUI[8].text = "What a display of power! Your dragon spreads its wings and roars, content."
+    :?growth <= 1
+      waterUI[8].text = "The egg shakes with excitement. A few cracks form on its shell."
+    :?growth = 2
+      waterUI[8].text = "What a display of power! Your dragon jumps around and squeaks, content."
+    :
+      waterUI[8].text = "What a display of power! Your dragon raises its head and trills, content."
+
+  :?curQuest = 1
+    waterUI[8].text = "Strength from the essence of the fallen. A forbidden light glimmers."
+
+  :?curQuest = 2
+    ?growth <= 1
+      waterUI[8].text = "You polish the egg carefully. It glows with a gentle warm light."
+    :
+      waterUI[8].text = "A quick polishing of scales ought to do some good. Your dragon trills."
+
+  :?curQuest = 3
+    ?growth <= 1
+      waterUI[8].text = "You make a small nest and place the egg within. Warm and happy."
+    :
+      waterUI[8].text = "Suitable material for nesting. Your dragon takes the material away."
+
+  :?curQuest = 4
+    ?growth <= 1
+      waterUI[8].text = "Which of these was the egg again? Why did you think this was a good idea?"
+    :
+      waterUI[8].text = "Smooth and shiny. A fine addition to your dragon's treasure hoard."
+
+  :?curQuest = 5
+    ?growth <= 1
+      waterUI[8].text = "There is no reaction from the egg. You decide to stash the metal away."
+    :
+      waterUI[8].text = "Your dragon shakes its head. Somehow, a pile of stones appealed to it more."
+
+// Settings
+func switchPetVisible() // you monster! (;^;)
+  //Switches the dragon's visibility.
+  ?dragonLevel < 4
+    >You don't have a dragon.
+  :?PetIsEnabled
+    StoreSet("EnablePet", false)
+    dragon.visible = false
+    PetIsEnabled = false
+    settingsUI[2].children[0].text = "Pet Enabled [X]"
+  :
+    StoreSet("EnablePet", true)
+    dragon.visible = true
+    PetIsEnabled = true
+    mode = _MODECATCHUP
+    dragonX = mathMax(pos.x-70, posX-2)
+    dragonY = pos.z - pos.y
+    settingsUI[2].children[0].text = "Pet Enabled [V]"
+
+func checkFtoS()
+  //Frames per check to seconds per check
+  return ChecksPerFrame / 30.0
+
+func adjustCheckPerSecond(button)
+  //Edits the number of checks per second.
+  ?button = settingsUI[2].children[1].children[2]
+    ?ChecksPerFrame >= 30
+      StoreInc("15Fcheck", -15)
+      ChecksPerFrame -= 15
+  :
+    ?ChecksPerFrame <= 270
+      StoreInc("15Fcheck", 15) 
+      ChecksPerFrame += 15
+  
+  settingsUI[2].children[1].children[1].text = ""+checkFtoS()
+
+func setGrowth(btn)
+  //Sets the growth display of the dragon.
+  ?dragonLevel < 4
+    >You don't have a dragon.
+  :
+    ?btn.text = _SHAPEBEAN
+      StoreSet("shapeshift", _SHAPEBEAN)
+      settingsUI[3].children[0].text = "Current: "+_SHAPEBEAN
+      dragonShape = _SHAPEBEAN
+      gLvL = 2
+    :?btn.text = _SHAPENIPPER
+      StoreSet("shapeshift", _SHAPENIPPER)
+      settingsUI[3].children[0].text = "Current: "+_SHAPENIPPER
+      dragonShape = _SHAPENIPPER
+      gLvL = 3
+    :?btn.text = _SHAPEJUVENILE
+      StoreSet("shapeshift", _SHAPEJUVENILE)
+      settingsUI[3].children[0].text = "Current: "+_SHAPEJUVENILE
+      dragonShape = _SHAPEJUVENILE
+      gLvL = 4
+    :?btn.text = _SHAPEDRAGON
+      StoreSet("shapeshift", _SHAPEDRAGON)
+      settingsUI[3].children[0].text = "Current: "+_SHAPEDRAGON
+      dragonShape = _SHAPEDRAGON
+      gLvL = 5
+    :
+      >This shape isn't unlocked yet.
+      return
+    GrowthDisplayUpdate(GrowthLv())
+    >Dragon shape updated.
+    initialiseDragon(gLvL)
+
+//UI functions
+func switchSSRPG(sw)
+  //Switch for SSRPG UI.
+  ?sw
+    srUI.visible = true
+    srpgUI[0].text = " Quest Progress\n     _.Â´`._\n<:"+questArray[0][curQuest]+":>\n     â¾`..Â´â¾"
+  :
+    srUI.visible = false
+
+func switchWF(sw)
+  //Switch for Waterfall UI.
+  ?sw
+    wfUI.visible = true
+    waterUI[5].text = LvInfo()
+    waterUI[9].text = getProgress()+"/"+getRequirement()
+    ?questComplete()
+      getQuestCompleteDialogue()
+      waterUI[10].visible = true
+    :
+      waterUI[10].visible = false
+  :
+    wfUI.visible = false
+    waterUI[10].visible = false
+
+func switchSet(sw)
+  //Switch for Settings UI.
+  ?sw
+    setUI.visible = true
+    settingsUI[2].visible = true
+    settingsUI[3].visible = false
+    settingsUI[4].visible = false
+    //settingsUI[5].visible = false
+  :
+    setUI.visible = false
+    settingsUI[2].visible = false
+    settingsUI[3].visible = false
+    settingsUI[4].visible = false
+    //settingsUI[5].visible = false
+
+func switchExp(sw)
+  //Switch for Export UI.
+  ?sw
+    potUI.visible = true
+    exportUI[2] = "var PDRPG = import Cosmetics/PetDragonRPG\nPDRPG.replaceSave(["+printSave()+"])"
+  :
+    potUI.visible = false
+
+func switchShowSSRPG()
+  //Switch between showRPG UI and SSRPG UI.
+  ?currentUIshown = _CURUISHOWSSRPG
+    currentUIshown = _CURUISSRPG
+    StoreSet("showSsrpgUI",false)
+    switchSSRPG(true)
+    showSrpgUI.visible = false
+  :?currentUIshown = _CURUISSRPG
+    currentUIshown = _CURUISHOWSSRPG
+    StoreSet("showSsrpgUI",true)
+    switchSSRPG(false)
+    showSrpgUI.visible = true
+
+func switchWFSSRPG()
+  //Switch between Waterfall UI and SSRPG UI.
+  ?currentUIshown = _CURUISSRPG
+    currentUIshown = _CURUIWF
+    switchWF(true)
+    switchSSRPG(false)
+  :?currentUIshown = _CURUIWF
+    currentUIshown = _CURUISSRPG
+    switchWF(false)
+    switchSSRPG(true)
+
+func switchWFSetting()
+  //Switch between Waterfall UI and Setting UI.
+  ?currentUIshown = _CURUISET
+    currentUIshown = _CURUIWF
+    switchWF(true)
+    switchSet(false)
+  :?currentUIshown = _CURUIWF
+    currentUIshown = _CURUISET
+    switchWF(false)
+    switchSet(true)
+
+func switchSettingExport()
+  //Switch between Setting UI and Export UI.
+  ?currentUIshown = _CURUISET
+    currentUIshown = _CURUIEXPORT
+    switchExp(true)
+    switchSet(false)
+  :?currentUIshown = _CURUIEXPORT
+    currentUIshown = _CURUISET
+    switchExp(false)
+    switchSet(true)
+
+func switchSettingCategory(btn)
+  //Switches between the setting categories in Setting UI.
+  settingsUI[2].visible = (btn.text = "Performace")
+  settingsUI[3].visible = (btn.text = "Shapeshift")
+  settingsUI[4].visible = (btn.text = "Savefile")
+  //settingsUI[5].visible = (btn.text = "Savefile")
+
+//Array declarations for all settings.
+var dragonSize = [40,40]
+var dragSettings = [[],[],
+^[[23,20],[9,2],[96,48,12],[24,8],[6,3]],
+^[[36,21],[12,0],[192,96,99999],[12,4],[4,2]],
+^[[30,21],[7,0],[99999,30,20],[40,20],[3,2]],
+^[[30,24],[7,0],[12,12,8],[9,9],[2,1]]
+^]
+
+func dragonSettings(colour, relativeXY, faceXY, tDur, wDur, mSpeed, FarSet)
+  //Changes the settings of the dragon.
+  //If a variable is empty, the equivalent setting is kept as is.
+  ?colour
+    dArry[0].color = colour
+    dArry[1].color = colour
+    dArry[2].color = colour
+  
+  ?relativeXY
+    relativeX = relativeXY[0]
+    relativeY = relativeXY[1]
+  
+  ?faceXY
+    dArry[1].x = faceXY[0]
+    dArry[1].y = faceXY[1]
+  
+  ?tDur
+    tailDur = tDur
+  
+  ?wDur
+    walkDur = wDur
+  
+  ?mSpeed
+    jogSpeed = mSpeed[0]
+    runSpeed = mSpeed[1]
+  
+  ?FarSet
+    tooFar = FarSet
+
+func initialiseDragon(growthStage)
+  //Initialize the dragon.
+  //No dragon is spawned if dragon level is < 2.
+  ?gLvL >= 2
+    ?dragon
+      dragon.Recycle()
+    dragon = makeUI(_UIANIM,"","","","",dragonSize,Walk[growthStage]) // 0 walk animation (4 frames)
+    dragon.anchor = "top_left"
+    dragon.dock = "top_left"
+    dArry = dragon.children
+    uiAddChild(dragon,1,_UITEXT,"","","","","",Faces[growthStage][0]) // 1 faces 0->4
+    uiAddChild(dragon,2,_UIANIM,"","","","","",Tail[growthStage])     // 2 tail (6 frames)
+    
+    dragonSettings(clrSet,dragSettings[growthStage][0],dragSettings[growthStage][1],
+    ^dragSettings[growthStage][2],dragSettings[growthStage][3],dragSettings[growthStage][4],20)
+    ?growthStage = 4
+      dArry[2].pivotX = 7
+    :?growthStage = 5
+      dArry[2].pivotX = 5
+    
+    dragon.visible = PetIsEnabled
+    
+    masterPanel.Add(dragon, 0)
+
+func initialise()
+  //Initialises all storage variables and the dragon.
+  ?!StoreHas("dragonLevel")
+    resetSave()
+  gLvL = GrowthLv()
+  initialiseDragon(gLvL)
+
+//Arrays for the below function.
+var potUIPos = [[0,0],[20,50]]
+var potUICPos = [[[-1,0],[1,3]],
+              ^[[2,1],[10,45]],
+              ^[[2,4],[10,45]]]
+func export_UI()
+  //Initialises the export UI.
+  potUI = makeUI(_UIPANEL,"","","",potUIPos[0],potUIPos[1],"")
+  exportUI = potUI.children
+  uiAddChild(potUI,0,_UIBUTTON,"","top_right",switchSettingExport,potUICPos[0][0],potUICPos[0][1],"[X]")
+  uiAddChild(potUI,1,_UITEXT,"","top_left","",potUICPos[1][0],potUICPos[1][1],
+  ^"Run this command to import your savefile when needed.")
+  uiAddChild(potUI,2,_UITEXT,"","top_left","",potUICPos[2][0],potUICPos[2][1],
+  ^"var PDRPG = import Cosmetics/PetDragonRPG\nPDRPG.replaceSave(["+printSave()+"])")
+  switchExp((currentUIshown = _CURUIEXPORT))
+
+//Arrays for the below function.
+var setUIPos = [[0,0],[20,55]]
+var setUICPos = [[[0,-1],[3,5]],
+                ^[[1,1],[18,17]],
+                ^[[19,1],[18,36]],
+                ^[[19,1],[18,36]],
+                ^[[19,1],[18,36]],
+                ^[[19,1],[18,36]]]
+var setUICatPos = [[[18,0]],
+                  ^[[3,15]],
+                  ^[[0,3],[3,15]],
+                  ^[[0,6],[3,15]],
+                  ^[[0,6],[3,15]]]
+var setUIPerfPos = [[[2,0],[3,17]],
+                   ^[[2,3],[3,17]]]
+var setUICPSPos = [[[1,15]],
+                  ^[[9,0],[1,15]],
+                  ^[[3,5]],
+                  ^[[3,5]],
+                  ^[[0,4],[10,26]]]
+var setUIShapePos = [[[0,1],[1,20]],
+                    ^[[0,3],[3,20]],
+                    ^[[0,6],[3,20]],
+                    ^[[0,9],[3,20]],
+                    ^[[0,12],[3,20]]]
+var setUIUIPos = []
+var setUIExpPos = [[[3,15]],
+                  ^[[0,3],[3,15]],
+                  ^[[0,6],[3,15]]]
+func Settings_UI()
+  //Initialises the Settings UI.
+  setUI = makeUI(_UIPANEL,"","","",setUIPos[0],setUIPos[1],"")
+  settingsUI = setUI.children
+  
+  //Exit button
+  uiAddChild(setUI,0,_UIBUTTON,"","top_right",switchWFSetting,setUICPos[0][0],setUICPos[0][1],"[X]")
+  settingsUI[0].style = invisPanel
+  
+  //Settings categories
+  uiAddChild(setUI,1,_UIPANEL,"","top_left","",setUICPos[1][0],setUICPos[1][1],"")
+  settingsUI[1].style = invisPanel
+  uiAddChild(settingsUI[1],0,_UITEXT,"","top_right","","",setUICatPos[0][0],"ââââââââââââââââââ")
+  uiAddChild(settingsUI[1],1,_UIBUTTON,"","top_center",switchSettingCategory,"",setUICatPos[1][0],"Performace")
+  uiAddChild(settingsUI[1],2,_UIBUTTON,"","top_center",switchSettingCategory,setUICatPos[2][0],setUICatPos[2][1],"Shapeshift")
+  //uiAddChild(settingsUI[1],3,_UIBUTTON,"","top_center",switchSettingCategory,setUICatPos[3][0],setUICatPos[3][1],"UI")
+  uiAddChild(settingsUI[1],3,_UIBUTTON,"","top_center",switchSettingCategory,setUICatPos[4][0],setUICatPos[4][1],"Savefile")
+  
+  //Performance category
+  uiAddChild(setUI,2,_UIPANEL,"","top_left","",setUICPos[2][0],setUICPos[2][1],"")
+  settingsUI[2].style = invisPanel
+  uiAddChild(settingsUI[2],0,_UIBUTTON,"","top_left",switchPetVisible,setUIPerfPos[0][0],setUIPerfPos[0][1],"")
+  ?PetIsEnabled
+    settingsUI[2].children[0].text = "Pet Enabled [V]"
+  :
+    settingsUI[2].children[0].text = "Pet Enabled [X]"
+  uiAddChild(settingsUI[2],1,_UIPANEL,"#808080","top_left","",setUIPerfPos[1][0],setUIPerfPos[1][1],"[-] CPF:    [+]")
+  uiAddChild(settingsUI[2].children[1],0,_UITEXT,"","","","",setUICPSPos[0][0],"|=| CPS: .0 |=|")
+  uiAddChild(settingsUI[2].children[1],1,_UITEXT,"","center_left","",setUICPSPos[1][0],setUICPSPos[1][1],""+checkFtoS())
+  uiAddChild(settingsUI[2].children[1],2,_UIBUTTON,"","center_left",adjustCheckPerSecond,"",setUICPSPos[2][0],"[-]")
+  uiAddChild(settingsUI[2].children[1],3,_UIBUTTON,"","center_right",adjustCheckPerSecond,"",setUICPSPos[3][0],"[+]")
+  settingsUI[2].children[1].children[2].style = invisPanel
+  settingsUI[2].children[1].children[3].style = invisPanel
+  var CPFexplained = "CPS = Checks Per Second. \n\n"
+  ^+"Increasing this will reduce lag, but resources take longer to be tallied up for quests.\n\n"
+  uiAddChild(settingsUI[2].children[1],4,_UITEXT,"","top_left","",setUICPSPos[4][0],setUICPSPos[4][1], CPFexplained)
+
+  //Shapeshift category
+  uiAddChild(setUI,3,_UIPANEL,"","top_left","",setUICPos[3][0],setUICPos[3][1],"")
+  settingsUI[3].style = invisPanel
+  uiAddChild(settingsUI[3],0,_UITEXT,"","top_center","",setUIShapePos[0][0],setUIShapePos[0][1], "Current: "+dragonShape)
+  settingsUI[3].children[0].align = center
+  uiAddChild(settingsUI[3],1,_UIBUTTON,"","top_center",setGrowth,setUIShapePos[1][0],setUIShapePos[1][1], "Locked")
+  uiAddChild(settingsUI[3],2,_UIBUTTON,"","top_center",setGrowth,setUIShapePos[2][0],setUIShapePos[2][1], "Locked")
+  uiAddChild(settingsUI[3],3,_UIBUTTON,"","top_center",setGrowth,setUIShapePos[3][0],setUIShapePos[3][1], "Locked")
+  uiAddChild(settingsUI[3],4,_UIBUTTON,"","top_center",setGrowth,setUIShapePos[4][0],setUIShapePos[4][1], "Locked")
+  ?dragonLevel >= 20
+    settingsUI[3].children[4].text = _SHAPEDRAGON
+  ?dragonLevel >= 12
+    settingsUI[3].children[3].text = _SHAPEJUVENILE
+  ?dragonLevel >= 8
+    settingsUI[3].children[2].text = _SHAPENIPPER
+  ?dragonLevel >= 4
+    settingsUI[3].children[1].text = _SHAPEBEAN
+
+  /*UI category
+  uiAddChild(setUI,4,_UIPANEL,"","top_left","",setUICPos[4][0],setUICPos[4][1],"")
+  settingsUI[4].style = invisPanel
+  */
+  
+  //Savefile category
+  uiAddChild(setUI,4,_UIPANEL,"","top_left","",setUICPos[5][0],setUICPos[5][1],"")
+  settingsUI[4].style = invisPanel
+  uiAddChild(settingsUI[4],0,_UIBUTTON,"","top_center",switchSettingExport,"",setUIExpPos[0][0],"Export Save")
+  uiAddChild(settingsUI[4],1,_UIBUTTON,"","top_center",switchSettingExport,setUIExpPos[1][0],setUIExpPos[1][1],"Reset Save")
+  uiAddChild(settingsUI[4],2,_UIBUTTON,"","top_center",switchSettingExport,setUIExpPos[2][0],setUIExpPos[2][1],"Delete Save")
+  switchSet((currentUIshown = _CURUISET))
+
+//Array for the function below.
+var growthPos = [
+^[[10,4],[10,25]],
+^[[8,5],[10,25]],
+^[[7,4],[10,25]],
+^[[5,3],[10,25]],
+^[[4,2],[10,25]],
+^[[1,1],[10,25]],
+^]
+func GrowthDisplayUpdate(growthLv)
+  //Displays the current dragon growth.
+  ?growthLv < dragonStatic.Count()
+    waterUI[6].children[0].x = growthPos[growthLv][0][0]
+    waterUI[6].children[0].y = growthPos[growthLv][0][1]
+    waterUI[6].children[0].h = growthPos[growthLv][1][0]
+    waterUI[6].children[0].w = growthPos[growthLv][1][1]
+    waterUI[6].children[0].text = dragonStatic[growthLv]
+
+//Array for the below function.
+var wfUIPos = [[0,1], [24,55]]
+var staticdragonPos = [[0,1],[10,25]]
+var wfUICPos = [[[0,-7], [10,0]],
+               ^[[0,0], [0,55]],
+               ^[[0,1], [0,30]],
+               ^[[-1,2],[5,26]],
+               ^[[-9,7],[5,10]],
+               ^[[1,1],[0,26]],
+               ^[[0,0],[11,26]],
+               ^[[0,6],[5,35]],
+               ^[[0,8],[5,53]],
+               ^[[0,9],[0,25]],
+               ^[[0,2],[3,30]],
+               ^[[3,5]],
+               ^[[-1,0],[1,3]]]           
+func Waterfall_UI()
+  //Initializes the Waterfall UI.
+  wfUI = makeUI(_UIPANEL,"","","", wfUIPos[0], wfUIPos[1], "")  
+  wfUI.clip = true
+  waterUI = wfUI.children
+
+  wfUI.Add(makeUI(_UITEXT,"","","", wfUICPos[0][0], wfUICPos[0][1], "â¬âââââââââââ"))
+  wfUI.Add(makeUI(_UITEXT,"","","", wfUICPos[1][0], wfUICPos[1][1], "ââââââââââââââââââââââââââââ´âââââââââââââââââââââââââââ¤"))
+  wfUI.Add(makeUI(_UITEXT,"","","", wfUICPos[2][0], wfUICPos[2][1], "ââââââââââââââââ\nâ    Quests    â\nââââââââââââââââ"))
+  waterUI[2].align = center
+
+  uiAddChild(wfUI,3,_UIPANEL,"#808080","top_right","",wfUICPos[3][0], wfUICPos[3][1],"")
+  uiAddChild(wfUI,4,_UIBUTTON,"","top_right",LevelUpButton,wfUICPos[4][0], wfUICPos[4][1], "Feed")
+  uiAddChild(wfUI,5,_UITEXT,"","top_right","",wfUICPos[5][0],wfUICPos[5][1],LvInfo())
+  
+  uiAddChild(wfUI,6,_UIPANEL,"#808080","bottom_right","",wfUICPos[6][0], wfUICPos[6][1],"")
+  waterUI[6].dock = "center_center"
+  waterUI[6].style = addStyle("ââââ ââââ")
+  uiAddChild(waterUI[6],0,_UITEXT,"","center_center","",staticdragonPos[0],staticdragonPos[1],"")
+  //waterUI[6].children[0].dock = "center_center"
+  GrowthDisplayUpdate(GrowthLv())
+
+
+  uiAddChild(wfUI,7,_UITEXT,"","","",wfUICPos[7][0], wfUICPos[7][1],"<< "+questArray[0][curQuest]+" >>")
+  waterUI[7].align = center
+  uiAddChild(wfUI,8,_UITEXT,"","","",wfUICPos[8][0], wfUICPos[8][1],questDialogue())
+  waterUI[8].align = center
+  uiAddChild(wfUI,9,_UITEXT,"","","",wfUICPos[9][0], wfUICPos[9][1],getProgress()+"/"+getRequirement())
+  waterUI[9].align = center
+  uiAddChild(wfUI,10,_UIBUTTON,"","",questFinished,wfUICPos[10][0], wfUICPos[10][1],"Collect Reward")
+  waterUI[10].visible = false
+  ?questComplete()
+    getQuestCompleteDialogue()
+    waterUI[10].visible = wfUI.visible
+
+  uiAddChild(wfUI,11,_UIBUTTON,"","center_center",switchWFSetting,"",wfUICPos[11][0],"[â¼]")
+  waterUI[11].style = invisPanel
+  uiAddChild(wfUI,12,_UIBUTTON,"","top_right",switchWFSSRPG,wfUICPos[12][0], wfUICPos[12][1],"[X]")
+  waterUI[12].style = invisPanel
+
+  switchWF((currentUIshown = _CURUIWF))
+
+var gpgr
+//Arrays for the below function.
+var srUIPos = [[1,-1],[7,20]]
+var showSrpgPos = [[1,5],[3,9]]
+var srUICPos = [[[2,-1],[5,99]],
+               ^[[0,-1],[1,0]],
+               ^[[2,-1],[3,5]],
+               ^[[5,4],[3,5]]]
+func SSRPG_UI()
+  //Initializes the SSRPG UI.
+  srUI = makeUI(_UIPANEL,"","bottom_left","",srUIPos[0],srUIPos[1],"")
+  srpgUI = srUI.children
+  showSrpgUI = makeUI(_UIBUTTON,"","top_left",switchShowSSRPG,showSrpgPos[0],showSrpgPos[1],"[Show UI]")
+  showSrpgUI.style = invisPanel
+
+  gpgr = getProgress()+"/"+getRequirement()
+  uiAddChild(srUI,0,_UITEXT,"","bottom_left","",srUICPos[0][0],srUICPos[0][1]," Quest Progress\n     _.Â´`._\n<:"+questArray[0][curQuest]+":>\n     â¾`..Â´â¾")
+  srUICPos[1][1][1] = stringSize(gpgr)
+  uiAddChild(srUI,1,_UITEXT,"","bottom_center","",srUICPos[1][0],srUICPos[1][1],gpgr)
+
+  uiAddChild(srUI,2,_UIBUTTON,"","top_right",switchShowSSRPG,srUICPos[2][0],srUICPos[2][1],"[X]")
+  srpgUI[2].style = invisPanel
+  uiAddChild(srUI,3,_UIBUTTON,"","top_right",switchWFSSRPG,srUICPos[3][0],srUICPos[3][1],"â¡")
+
+  switchSSRPG((currentUIshown = _CURUISSRPG))
+  showSrpgUI.visible = (currentUIshown = _CURUISHOWSSRPG)
+
+// Location Script
+//Check if level is special (i.e. legends or cutscene levels)
+var is0Stars
+?ttime = 1
+  mHP = maxhp
+  is0Stars = (loc.stars = 0)
+  ?loc.begin
+    ?StoreGet("showSsrpgUI",false)
+      currentUIshown = _CURUISHOWSSRPG
+    :
+      currentUIshown = _CURUISSRPG
+  ?ui.root.children.Count()>0
+    for i = 0..ui.root.children.Count()-1
+      ?ui.root.children[i].style = specPanel
+        ui.root.children[i].Recycle()
+        break
+  startPanel()
+  initialise()
+  SSRPG_UI()
+  Waterfall_UI()
+  Settings_UI()
+  export_UI()
+?!is0Stars // Other Locations
+  foecount = foeCount(138)
+  ?foecount < oldfoecount
+    StoreInc("kills", oldfoecount-foecount)
+    killStorage += oldfoecount-foecount
+    ?curQuest = 0
+      StoreInc(questArray[2][curQuest],oldfoecount-foecount)
+  oldfoecount = foecount
+
+  ?ttime % ChecksPerFrame = 1 // Improves performance, only check every 15 frames
+    kiget = res.ki
+    target = res.tar
+    woodget = res.wood
+    stoneget = res.stone
+    bronzeget = res.bronze
+    ?kiget > oldkiget
+      StoreInc("ki", kiget-oldkiget)
+      kiStorage += kiget-oldkiget
+      ?curQuest = 1
+        StoreInc(questArray[2][curQuest],kiget-oldkiget)
+      oldkiget = kiget
+
+    ?target > oldtarget
+      StoreInc("tar", target-oldtarget)
+      tarStorage += target-oldtarget
+      ?curQuest = 2
+        StoreInc(questArray[2][curQuest],target-oldtarget)
+      oldtarget = target
+
+    ?woodget > oldwoodget
+      StoreInc("wood", woodget-oldwoodget)
+      woodStorage += woodget-oldwoodget
+      ?curQuest = 3
+        StoreInc(questArray[2][curQuest],woodget-oldwoodget)
+      oldwoodget = woodget
+
+    ?stoneget > oldstoneget
+      StoreInc("stone", stoneget-oldstoneget)
+      stoneStorage += stoneget-oldstoneget
+      ?curQuest = 4
+        StoreInc(questArray[2][curQuest],stoneget-oldstoneget)
+      oldstoneget = stoneget
+
+    ?bronzeget > oldbronzeget
+      StoreInc("bronze", bronzeget-oldbronzeget)
+      bronzeStorage += bronzeget-oldbronzeget
+      ?curQuest = 5
+        StoreInc(questArray[2][curQuest],bronzeget-oldbronzeget)
+      oldbronzeget = bronzeget
+
+    srpgUI[0].text = " Quest Progress\n     _.Â´`._\n<:"+questArray[0][curQuest]+":>\n     â¾`..Â´â¾"
+    ?currentUIshown = _CURUIWF
+      waterUI[5].text = LvInfo()
+      waterUI[9].text = getProgress()+"/"+getRequirement()
+      ?questComplete()
+        getQuestCompleteDialogue()
+        waterUI[10].visible = true
+
+    // If Quest Complete
+    ?questComplete()
+      srpgUI[1].w = 10
+      srpgUI[1].text = "!Complete!"
+      showSrpgUI.text = "[!Quest!]"
+
+    : // Quest not Complete
+      ?currentUIshown = _CURUISSRPG
+        gpgr = getProgress()+"/"+getRequirement()
+        srpgUI[1].w = stringSize(gpgr)
+        srpgUI[1].text = gpgr
+//
+?PetIsEnabled
+  runDragon()
